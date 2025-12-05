@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
 
   printf(1, "Starting E-core Scheduling Test...\n");
 
-  for(k = 0; k < 2; k++){
+  for(k = 0; k < 7; k++){
     pid = fork();
     if(pid < 0){
       printf(1, "fork failed\n");

@@ -88,7 +88,13 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-
+  p->ctime = ticks;
+  struct cpu *c = mycpu();
+  if(c) {
+      p->cpu_affinity = c->apicid;
+  } else {
+      p->cpu_affinity = 0;
+  }
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -124,7 +130,7 @@ userinit(void)
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
   p = allocproc();
-  
+  p->cpu_affinity = 0;
   initproc = p;
   if((p->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
@@ -319,6 +325,8 @@ wait(void)
 //  - swtch to start running that process
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
+// Inside proc.c
+
 void
 scheduler(void)
 {
@@ -327,32 +335,53 @@ scheduler(void)
   c->proc = 0;
   
   for(;;){
-    // Enable interrupts on this processor.
     sti();
 
-    // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-      p->tick_count = 0; 
+    if(c->core_type == 1){ 
+      struct proc *lowest_p = 0;
 
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state != RUNNABLE) continue;
+        
+        if(p->cpu_affinity != c->apicid) continue;
 
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+        if(lowest_p == 0 || p->ctime < lowest_p->ctime){
+          lowest_p = p;
+        }
+      }
+
+      if(lowest_p != 0){
+        p = lowest_p;
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
+        c->proc = 0;
+      }
     }
-    release(&ptable.lock);
+    else { 
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        
+        if(p->state != RUNNABLE) continue;
+        
+        if(p->cpu_affinity != c->apicid) continue;
 
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+        
+        p->tick_count = 0; 
+        
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
+        c->proc = 0;
+      }
+    }
+
+    release(&ptable.lock);
   }
 }
 
