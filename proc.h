@@ -1,4 +1,6 @@
 // Per-CPU state
+// TYPE_E  = 0  
+// TYPE_P =  1  
 struct cpu {
   uchar apicid;                // Local APIC ID
   struct context *scheduler;   // swtch() here to enter scheduler
@@ -7,7 +9,8 @@ struct cpu {
   volatile uint started;       // Has the CPU started?
   int ncli;                    // Depth of pushcli nesting.
   int intena;                  // Were interrupts enabled before pushcli?
-  struct proc *proc;           // The process running on this cpu or null
+  struct proc *proc; 
+  int core_type;          // The process running on this cpu or null
 };
 
 extern struct cpu cpus[NCPU];

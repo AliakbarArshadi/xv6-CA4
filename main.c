@@ -19,7 +19,17 @@ main(void)
 {
   kinit1(end, P2V(4*1024*1024)); // phys page allocator
   kvmalloc();      // kernel page table
-  mpinit();        // detect other processors
+  mpinit();   
+  for(int i = 0; i < ncpu; i++){
+  
+    if(cpus[i].apicid % 2 == 0) {
+        cpus[i].core_type = 0;
+        cprintf("CPU %d set as E-core\n", cpus[i].apicid);
+    } else {
+        cpus[i].core_type = 1;
+        cprintf("CPU %d set as P-core\n", cpus[i].apicid);
+    }
+}     
   lapicinit();     // interrupt controller
   seginit();       // segment descriptors
   picinit();       // disable pic
